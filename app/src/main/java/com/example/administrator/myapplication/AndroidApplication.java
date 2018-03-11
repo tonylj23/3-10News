@@ -46,7 +46,7 @@ public class AndroidApplication extends Application {
             return;
         }
         LeakCanary.install(this);
-        RetrofitService.init();
+//        RetrofitService.init();
     }
 
 
