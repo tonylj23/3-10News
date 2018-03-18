@@ -27,6 +27,7 @@ import retrofit2.Retrofit;
 public class AndroidApplication extends Application {
     private static final String DB_NAME="news-db";
     private static Context appContext;
+    private static AndroidApplication instance;
 
     private RxBus mRxBus= RxBus.get();
     private DaoSession daoSession;
@@ -35,10 +36,14 @@ public class AndroidApplication extends Application {
     public void onCreate() {
         super.onCreate();
         appContext=getApplicationContext();
+        instance=this;
         _initDatabase();
         _initConfig();
     }
 
+    public static AndroidApplication getInstance(){
+        return instance;
+    }
     private void _initConfig() {
         if (LeakCanary.isInAnalyzerProcess(this)) {
             // This process is dedicated to LeakCanary for heap analysis.
@@ -46,7 +51,7 @@ public class AndroidApplication extends Application {
             return;
         }
         LeakCanary.install(this);
-//        RetrofitService.init();
+        RetrofitService.init();
     }
 
 
@@ -60,8 +65,16 @@ public class AndroidApplication extends Application {
         NewsTypeDao.updateLocalData(this,daoSession);
     }
 
-    @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
-    public void registerActivityLifecycleCallbacks(Application.ActivityLifecycleCallbacks callback) {
-        this.registerActivityLifecycleCallbacks(callback);
+    public DaoSession getDaoSession(){
+        return daoSession;
     }
+
+    public RxBus getmRxBus(){
+        return mRxBus;
+    }
+
+//    @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
+//    public void registerActivityLifecycleCallbacks(Application.ActivityLifecycleCallbacks callback) {
+//        this.registerActivityLifecycleCallbacks(callback);
+//    }
 }

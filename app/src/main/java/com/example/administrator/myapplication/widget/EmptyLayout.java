@@ -41,7 +41,7 @@ public class EmptyLayout extends FrameLayout {
     @BindView(R.id.empty_loading)
     SpinKitView empty_loading;
     @BindView(R.id.net_error_tv)
-    TextView net_erroe_tv;
+    TextView net_error_tv;
 
     public interface OnRetryListener{
         void onRetry();
@@ -93,13 +93,13 @@ public class EmptyLayout extends FrameLayout {
         switch (mEmptyStatus){
             case STATUS_LOADING:
                 setVisibility(VISIBLE);
-                net_erroe_tv.setVisibility(GONE);
+                net_error_tv.setVisibility(GONE);
                 empty_loading.setVisibility(VISIBLE);
                 break;
             case STATUS_NO_DATA:
             case STATUS_NO_NET:
                 setVisibility(VISIBLE);
-                net_erroe_tv.setVisibility(VISIBLE);
+                net_error_tv.setVisibility(VISIBLE);
                 empty_loading.setVisibility(GONE);
                 break;
             case STATUS_HIDE:

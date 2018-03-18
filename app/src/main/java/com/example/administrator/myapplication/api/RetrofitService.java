@@ -1,10 +1,38 @@
 package com.example.administrator.myapplication.api;
 
+import android.support.annotation.NonNull;
+
 import com.example.administrator.myapplication.AndroidApplication;
+import com.example.administrator.myapplication.api.bean.NewsInfo;
+import com.example.administrator.myapplication.utils.NetUtil;
+import com.google.gson.Gson;
+import com.jakewharton.retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
+import com.orhanobut.logger.Logger;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
+import io.reactivex.Observable;
+import io.reactivex.ObservableSource;
+import io.reactivex.Scheduler;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.functions.Function;
+import io.reactivex.schedulers.Schedulers;
 import okhttp3.Cache;
+import okhttp3.CacheControl;
+import okhttp3.Interceptor;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okio.Buffer;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
 
 /**
  * Created by Administrator on 2018/3/11 0011.
@@ -24,6 +52,7 @@ public class RetrofitService {
     private static final String NEWS_HOST = "http://c.3g.163.com/";
     private static final String WELFARE_HOST = "http://gank.io/";
     private static final int INCREASE_PAGE = 20;
+    private static INewsApi newsApi;
 
     private RetrofitService(){
         throw new AssertionError();
@@ -31,5 +60,96 @@ public class RetrofitService {
     public static void init(){
         Cache cache = new Cache(new File(AndroidApplication.getAppContext().getCacheDir(), "HttpCache"),
                 1024 * 1024 * 100);
+        OkHttpClient okHttpClient = new OkHttpClient.Builder().cache(cache)
+                .retryOnConnectionFailure(true)
+                .addInterceptor(sLoggingInterceptor)
+                .addNetworkInterceptor(sRewriteCacheControlInterceptor)
+                .connectTimeout(10, TimeUnit.SECONDS)
+                .build();
+
+        Retrofit retrofit = new Retrofit.Builder()
+                .client(okHttpClient)
+                .addConverterFactory(GsonConverterFactory.create())
+                .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
+                .baseUrl(NEWS_HOST)
+                .build();
+        newsApi = retrofit.create(INewsApi.class);
+    }
+
+    private static final Interceptor sLoggingInterceptor=new Interceptor() {
+        @Override
+        public Response intercept(Chain chain) throws IOException {
+            Request request = chain.request();
+            Buffer buffer = new Buffer();
+            if(request.body()!=null){
+                request.body().writeTo(buffer);
+            }else{
+                Logger.d("LogTag","request.boty()==null");
+            }
+
+            Logger.w(request.url()+(request.body()!=null?"?"+_parseParams(request.body(),buffer):""));
+            Response proceed = chain.proceed(request);
+            return proceed;
+        }
+    };
+
+    private static final Interceptor sRewriteCacheControlInterceptor=new Interceptor() {
+        @Override
+        public Response intercept(Chain chain) throws IOException {
+            Request request = chain.request();
+            if(!NetUtil.isNetworkAvailable(AndroidApplication.getAppContext())){
+                request = request.newBuilder().cacheControl(CacheControl.FORCE_CACHE).build();
+                Logger.e("no network");
+            }
+            Response originalResponse = chain.proceed(request);
+            if(NetUtil.isNetworkAvailable(AndroidApplication.getAppContext())){
+                String cacheControl = request.cacheControl().toString();
+                return originalResponse.newBuilder()
+                        .header("Cache-Control",cacheControl)
+                        .removeHeader("Pragma")
+                        .build();
+            }else{
+                return originalResponse.newBuilder()
+                        .header("Cache-Control","public,"+CACHE_CONTROL_CACHE)
+                        .removeHeader("Pragma")
+                        .build();
+            }
+        }
+    };
+
+    @NonNull
+    private static String _parseParams(RequestBody body, Buffer buffer) throws UnsupportedEncodingException {
+        if(body.contentType()!=null&&!body.contentType().toString()
+                .contains("multipart")){
+            return URLDecoder.decode(buffer.readUtf8(),"UTF-8");
+        }
+        return null;
+    }
+
+    public static Observable<List<NewsInfo>> getNewsList(final String newsId, int page){
+        String type;
+        if(newsId.equals(HEAD_LINE_NEWS)){
+            type="headline";
+        }else {
+            type="list";
+        }
+//        Observable<Map<String, List<NewsInfo>>> newsList = newsApi.getNewsList(type, newsId, page * INCREASE_PAGE);
+        return  newsApi.getNewsList(type, newsId, page * INCREASE_PAGE)
+                .observeOn(Schedulers.io())
+                .flatMap(new Function<Map<String, List<NewsInfo>>, ObservableSource<List<NewsInfo>>>() {
+                    @Override
+                    public ObservableSource<List<NewsInfo>> apply(Map<String, List<NewsInfo>> stringListMap) throws Exception {
+                        return Observable.just(stringListMap.get(newsId));
+                    }
+                });
+
+//                newsList.subscribeOn(Schedulers.io())
+//                .observeOn(Schedulers.io())
+//                .flatMap(new Function<Map<String, List<NewsInfo>>, ObservableSource<NewsInfo>>() {
+//                    @Override
+//                    public ObservableSource<NewsInfo> apply(Map<String, List<NewsInfo>> stringListMap) throws Exception {
+//                        return Observable.fromIterable(stringListMap.get(newsId));
+//                    }
+//                });
     }
 }

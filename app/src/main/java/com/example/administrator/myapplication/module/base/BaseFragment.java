@@ -21,6 +21,7 @@ import butterknife.ButterKnife;
  */
 
 public abstract class BaseFragment<T extends IBasePresenter> extends RxFragment implements IBaseView,EmptyLayout.OnRetryListener {
+    @Nullable
     @BindView(R.id.empty_layout)
     EmptyLayout mEmptyLayout;
     protected Context mContext;
